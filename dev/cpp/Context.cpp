@@ -141,6 +141,12 @@ Context::Context (int w, int h, char * id) {
 
     glLinkProgram(programObject);
     glValidateProgram(programObject);
+
+    // Generate a texture object
+    glGenTextures(1, &texId);
+
+    glGenBuffers(1, &vertexObject);
+    glGenBuffers(1, &indexObject);
 }
 
 Context::~Context (void) {
@@ -154,10 +160,6 @@ void Context::run (uint8_t* buffer) {
     emscripten_webgl_make_context_current(context);
     glUseProgram( programObject );
 
-    GLuint texId;
-    GLuint vertexObject;
-    GLuint indexObject;
-
     // Get the attribute/sampler locations
     GLint positionLoc = glGetAttribLocation(programObject, "position");
     GLint texCoordLoc = glGetAttribLocation(programObject, "texCoord");
@@ -170,9 +172,6 @@ void Context::run (uint8_t* buffer) {
     glUniform1f(widthUniform, (float) width);
     glUniform1f(heightUniform, (float) height);
 
-
-    // Generate a texture object
-    glGenTextures(1, &texId);
     glUniform1i(textureLoc, 0);
 
     // Bind it
@@ -189,11 +188,9 @@ void Context::run (uint8_t* buffer) {
                              1.0, -1.0, 0.0, 1.0,  1.0, 1.0, 1.0, 0.0, 1.0,  0.0};
     GLushort indices[] = { 0, 1, 2, 0, 2, 3 };
 
-    glGenBuffers(1, &vertexObject);
     glBindBuffer(GL_ARRAY_BUFFER, vertexObject);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vVertices), vVertices, GL_STATIC_DRAW);
 
-    glGenBuffers(1, &indexObject);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexObject);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 

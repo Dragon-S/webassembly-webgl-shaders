@@ -16,6 +16,10 @@ private:
     GLuint vertexShader;
     GLuint fragmentShader;
 
+    GLuint texId;
+    GLuint vertexObject;
+    GLuint indexObject;
+
     EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context;
 
 };

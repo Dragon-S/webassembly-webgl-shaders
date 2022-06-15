@@ -1,79 +1,103 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>WebAssembly WebGL Shaders</title>
+    <meta charset="UTF-8">
+    <title>Video Effect Test</title>
     <script src="./wasm-arrays.js"></script>
     <script src="./dist/appWASM.js"></script>
-    <script>
-    "use strict"
-    window.addEventListener("wasmLoaded", () => {
-
-        console.log("wasmLoaded")
-
-        let previewCanvasContext
-
-        const createCanvas = (id, index, width, height) => {
-            const canvas = document.createElement("canvas")
-            canvas.id = id
-            canvas.width = width
-            canvas.height = height
-            canvasContainer.appendChild(canvas)
-            const context = canvas.getContext("webgl2")
-
-            const idBuffer = Module._malloc(id.length+1)
-            Module.stringToUTF8(id, idBuffer, id.length+1)
-            Module.ccall("createContext", null, ["number", "number", "number", "number"], [width, height, idBuffer, index])
+    <style>
+        .main {
+            width: 800px;
+            margin: 0 auto;
         }
 
-        const loadImage = src => {
-
-            Module.ccall("clearContexts", null, null, null)
-
-            const img = new Image()
-            img.addEventListener("load", () => {
-
-                const canvas = document.createElement("canvas")
-                canvas.id = "previewCanvas"
-                canvas.height = img.height
-                canvas.width = img.width
-
-                canvasContainer.innerHTML = ""
-                previewCanvasContext = canvas.getContext("2d")
-                previewCanvasContext.drawImage(img, 0, 0)
-                canvasContainer.appendChild(canvas)
-
-                createCanvas("textureLoad", 0, img.width, img.height)
-                createCanvas("edgeDetect", 1, img.width, img.height)
-            })
-
-            img.src = src
+        video {
+            width: 100%;
         }
 
-        // Default image
-        loadImage("image.png")
+        p {
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+        }
 
-        // File input
-        fileInput.addEventListener("change", event => loadImage(URL.createObjectURL(event.target.files[0])))
-
-        convert.addEventListener("click", () => {
-
-            // Get imageData from the image
-            const imageData = previewCanvasContext.getImageData(0, 0, previewCanvas.width, previewCanvas.height).data
-
-            // Pass the imageData to the C++ code
-            ccallArrays("loadTexture", null, ["array"], [imageData], {heapIn: "HEAPU8"})
-            ccallArrays("detectEdges", null, ["array"], [imageData], {heapIn: "HEAPU8"})
-        })
-    })
-    </script>
+        button {
+            cursor: pointer;
+        }
+    </style>
 </head>
 <body>
+<div class="main">
+    <p>
+        <button onclick="onStartCamera()">start camera</button>
+        <button onclick="onStartGlDraw()">start GlDraw</button>
+        <button onclick="onStopGlDraw()">stop GlDraw</button>
+    </p>
+</div>
 
-<input id="fileInput" type="file" accept="image/*" value="./image.png">
-<button id="convert">Convert</button>
+<script>
+    const originalVideo = document.createElement("video");
+    const originalCanvas = document.createElement("canvas");
+    originalCanvas.width = 1280;
+    originalCanvas.height = 720;
+    const previewCanvasContext = originalCanvas.getContext("2d");
+
+    window.addEventListener("wasmLoaded", () => {
+        console.log("wasmLoaded");
+    });
+
+    const createCanvas = (id, index, width, height) => {
+        const canvas = document.createElement("canvas")
+        canvas.id = id
+        canvas.width = width
+        canvas.height = height
+        canvasContainer.appendChild(canvas)
+        const context = canvas.getContext("webgl2")
+
+        const idBuffer = Module._malloc(id.length+1)
+        Module.stringToUTF8(id, idBuffer, id.length+1)
+        Module.ccall("createContext", null, ["number", "number", "number", "number"], [width, height, idBuffer, index])
+    }
+
+    const onStartCamera = async () => {
+        let originStream = await navigator.mediaDevices.getUserMedia({audio: false, video: {width: 1280, height: 720}});
+        originalVideo.autoplay = true;
+        originalVideo.srcObject = originStream;
+    };
+
+    originalVideo.addEventListener('canplay', () => {
+        Module.ccall("clearContexts", null, null, null)
+
+        createCanvas("textureLoad", 0, originalVideo.videoWidth, originalVideo.videoHeight)
+        createCanvas("edgeDetect", 1, originalVideo.videoWidth, originalVideo.videoHeight);
+
+        drawVideo();
+    })
+
+    const drawVideo = () => {
+        previewCanvasContext.drawImage(originalVideo, 0, 0, originalVideo.videoWidth, originalVideo.videoHeight);
+
+        let imageData = previewCanvasContext.getImageData(0, 0, originalCanvas.width, originalCanvas.height).data;
+
+        // Pass the imageData to the C++ code
+        ccallArrays("loadTexture", null, ["array"], [imageData], {heapIn: "HEAPU8"})
+        // let numBytes = imageData.length * imageData.BYTES_PER_ELEMENT;
+        // let dataPtr = Module._malloc(numBytes);
+        // let dataOnHeap = new Uint8Array(Module.HEAPU8.buffer, dataPtr, numBytes);
+        // // dataOnHeap.set(uint8ArrData);
+        // dataOnHeap.set(new Uint8Array(imageData.buffer));
+        // Module.ccall("detectEdges", null, ["HEAPU8", "number"], [dataOnHeap.byteOffset, dataOnHeap.length])
+
+        // Module._free(dataOnHeap.byteOffset)
+        // imageData = null
+
+        ccallArrays("detectEdges", null, ["array"], [imageData], {heapIn: "HEAPU8"})
+
+        requestAnimationFrame(drawVideo);
+    }
+</script>
 <br>
 <br>
 <span id="canvasContainer"></span>
-
 </body>
 </html>
